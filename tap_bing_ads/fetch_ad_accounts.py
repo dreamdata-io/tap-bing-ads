@@ -39,23 +39,35 @@ SOAP_REQUEST_CUSTOMER_AD_ACCOUNTS = """
 """
 
 
-def fetch_ad_accounts(access_token: str, developer_token: str):
+def _get_request_response(headers: dict, data: str):
     try:
         response = requests.post(
-            SOAP_CUSTOMER_MANAGEMENT_URL,
-            headers={"content-type": "text/xml", "SOAPAction": "GetCustomersInfo"},
-            data=SOAP_REQUEST_CUSTOMER_INFO.format(
-                authentication_token=access_token, developer_token=developer_token,
-            ),
+            SOAP_CUSTOMER_MANAGEMENT_URL, headers=headers, data=data,
         )
+
         response.raise_for_status()
+
+        response = response.content.decode("utf-8")
+        response = xmltodict.parse(response)
+
+        return response
     except HTTPError as http_err:
         logger.error(f"HTTP error occurred: {http_err}")
+    except UnicodeError as unicode_err:
+        logger.error(f"Unicode decoding error occurred: {unicode_err}")
     except Exception as err:
         logger.error(f"Other error occurred: {err}")
 
-    response = response.content.decode("utf-8")
-    response = xmltodict.parse(response)
+    raise Exception("Could not process request response")
+
+
+def fetch_ad_accounts(access_token: str, developer_token: str):
+    response = _get_request_response(
+        headers={"content-type": "text/xml", "SOAPAction": "GetCustomersInfo"},
+        data=SOAP_REQUEST_CUSTOMER_INFO.format(
+            authentication_token=access_token, developer_token=developer_token,
+        ),
+    )
 
     customer_id = None
 
@@ -65,24 +77,14 @@ def fetch_ad_accounts(access_token: str, developer_token: str):
 
     assert customer_id and isinstance(customer_id, str)
 
-    try:
-        response = requests.post(
-            SOAP_CUSTOMER_MANAGEMENT_URL,
-            headers={"content-type": "text/xml", "SOAPAction": "GetAccountsInfo"},
-            data=SOAP_REQUEST_CUSTOMER_AD_ACCOUNTS.format(
-                authentication_token=access_token,
-                developer_token=developer_token,
-                customer_id=customer_id,
-            ),
-        )
-        response.raise_for_status()
-    except HTTPError as http_err:
-        logger.error(f"HTTP error occurred: {http_err}")
-    except Exception as err:
-        logger.error(f"Other error occurred: {err}")
-
-    response = response.content.decode("utf-8")
-    response = xmltodict.parse(response)
+    response = _get_request_response(
+        headers={"content-type": "text/xml", "SOAPAction": "GetAccountsInfo"},
+        data=SOAP_REQUEST_CUSTOMER_AD_ACCOUNTS.format(
+            authentication_token=access_token,
+            developer_token=developer_token,
+            customer_id=customer_id,
+        ),
+    )
 
     ad_accounts = None
     ad_accounts = response["s:Envelope"]["s:Body"]["GetAccountsInfoResponse"][
