@@ -10,7 +10,7 @@ from datetime import datetime
 from zipfile import ZipFile
 
 import singer
-from singer import utils, metadata, metrics
+from singer import utils, metadata, metrics, Transformer
 from bingads import AuthorizationData, OAuthWebAuthCodeGrant, ServiceClient
 import suds
 from suds.sudsobject import asdict
@@ -547,13 +547,10 @@ def filter_selected_fields_many(selected_fields, objs):
 
 
 def sync_accounts_stream(account_ids, catalog_item):
-    selected_fields = get_selected_fields(catalog_item)
     accounts = []
 
     LOGGER.info("Initializing CustomerManagementService client - Loading WSDL")
     client = CustomServiceClient("CustomerManagementService")
-    account_schema = get_core_schema(client, "AdvertiserAccount")
-    singer.write_schema("accounts", account_schema, ["Id"])
 
     for account_id in account_ids:
         client = create_sdk_client("CustomerManagementService", account_id)
@@ -570,13 +567,7 @@ def sync_accounts_stream(account_ids, catalog_item):
         )
 
     max_accounts_last_modified = max([x["LastModifiedTime"] for x in accounts])
-
-    with metrics.record_counter("accounts") as counter:
-        singer.write_records(
-            "accounts", filter_selected_fields_many(selected_fields, accounts)
-        )
-        counter.increment(len(accounts))
-
+    sync_data(catalog_item, accounts, ["Id"])
     singer.write_bookmark(STATE, "accounts", "last_record", max_accounts_last_modified)
     singer.write_state(STATE)
 
@@ -591,15 +582,8 @@ def sync_campaigns(client, account_id, selected_streams):
         campaigns = response_dict["Campaign"]
 
         if "campaigns" in selected_streams:
-            selected_fields = get_selected_fields(selected_streams["campaigns"])
-            singer.write_schema(
-                "campaigns", get_core_schema(client, "Campaign"), ["Id"]
-            )
-            with metrics.record_counter("campaigns") as counter:
-                singer.write_records(
-                    "campaigns", filter_selected_fields_many(selected_fields, campaigns)
-                )
-                counter.increment(len(campaigns))
+            catalog_entry = selected_streams["campaigns"]
+            sync_data(catalog_entry, campaigns, ["Id"])
 
         return map(lambda x: x["Id"], campaigns)
 
@@ -614,21 +598,13 @@ def sync_ad_groups(client, account_id, campaign_ids, selected_streams):
             ad_groups = sobject_to_dict(response)["AdGroup"]
 
             if "ad_groups" in selected_streams:
+                catalog_entry = selected_streams["ad_groups"]
                 LOGGER.info(
                     "Syncing AdGroups for Account: {}, Campaign: {}".format(
                         account_id, campaign_id
                     )
                 )
-                selected_fields = get_selected_fields(selected_streams["ad_groups"])
-                singer.write_schema(
-                    "ad_groups", get_core_schema(client, "AdGroup"), ["Id"]
-                )
-                with metrics.record_counter("ad_groups") as counter:
-                    singer.write_records(
-                        "ad_groups",
-                        filter_selected_fields_many(selected_fields, ad_groups),
-                    )
-                    counter.increment(len(ad_groups))
+                sync_data(catalog_entry, ad_groups, ["Id"])
 
             ad_group_ids += list(map(lambda x: x["Id"], ad_groups))
     return ad_group_ids
@@ -652,14 +628,25 @@ def sync_ads(client, selected_streams, ad_group_ids):
         response_dict = sobject_to_dict(response)
 
         if "Ad" in response_dict:
-            selected_fields = get_selected_fields(selected_streams["ads"])
-            singer.write_schema("ads", get_core_schema(client, "Ad"), ["Id"])
-            with metrics.record_counter("ads") as counter:
-                ads = response_dict["Ad"]
-                singer.write_records(
-                    "ads", filter_selected_fields_many(selected_fields, ads)
+            catalog_entry = selected_streams["ads"]
+            sync_data(catalog_entry, response_dict["Ad"], ["Id"])
+
+
+def sync_data(catalog_entry, data, key_properties=None):
+
+    schema = catalog_entry.schema.to_dict()
+    mdata = metadata.to_map(catalog_entry.metadata)
+    tap_stream_id = catalog_entry.tap_stream_id
+    singer.write_schema(tap_stream_id, schema, key_properties)
+    with Transformer() as transformer:
+        with metrics.record_counter(tap_stream_id) as counter:
+            for d in data:
+                d = transformer.transform(d, schema, mdata)
+
+                singer.write_record(
+                    tap_stream_id, d,
                 )
-                counter.increment(len(ads))
+                counter.increment()
 
 
 def sync_core_objects(account_id, selected_streams):
