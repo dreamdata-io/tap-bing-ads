@@ -86,15 +86,19 @@ def fetch_ad_accounts(access_token: str, developer_token: str):
         ),
     )
 
-    ad_accounts = None
-    ad_accounts = response["s:Envelope"]["s:Body"]["GetAccountsInfoResponse"][
-        "AccountsInfo"
-    ]["a:AccountInfo"]
-
-    assert ad_accounts and isinstance(ad_accounts, list)
+    response = response["s:Envelope"]["s:Body"]["GetAccountsInfoResponse"]
 
     result_ad_accounts = []
-    for ad_account in ad_accounts:
-        result_ad_accounts.append(ad_account["a:Id"])
+
+    if response.get("AccountsInfo") and response.get("AccountsInfo").get(
+        "a:AccountInfo"
+    ):
+        ad_accounts = response["AccountsInfo"]["a:AccountInfo"]
+
+        if not isinstance(ad_accounts, list):
+            ad_accounts = [ad_accounts]
+
+        for ad_account in ad_accounts:
+            result_ad_accounts.append(ad_account["a:Id"])
 
     return customer_id, result_ad_accounts
