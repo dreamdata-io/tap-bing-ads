@@ -8,36 +8,6 @@ from requests.exceptions import HTTPError
 logger = logging.getLogger(__name__)
 
 SOAP_CUSTOMER_MANAGEMENT_URL = "https://clientcenter.api.bingads.microsoft.com/Api/CustomerManagement/v13/CustomerManagementService.svc"
-SOAP_REQUEST_CUSTOMER_INFO = """
-<s:Envelope xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-    <s:Header xmlns="https://bingads.microsoft.com/Customer/v13">
-        <Action mustUnderstand="1">GetCustomersInfo</Action>
-        <AuthenticationToken i:nil="false">{authentication_token}</AuthenticationToken>
-        <DeveloperToken i:nil="false">{developer_token}</DeveloperToken>
-    </s:Header>
-    <s:Body>
-        <GetCustomersInfoRequest xmlns="https://bingads.microsoft.com/Customer/v13">
-            <CustomerNameFilter i:nil="false"></CustomerNameFilter>
-            <TopN>1</TopN>
-        </GetCustomersInfoRequest>
-    </s:Body>
-</s:Envelope>
-"""
-SOAP_REQUEST_CUSTOMER_AD_ACCOUNTS = """
-<s:Envelope xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-    <s:Header xmlns="https://bingads.microsoft.com/Customer/v13">
-        <Action mustUnderstand="1">GetAccountsInfo</Action>
-        <AuthenticationToken i:nil="false">{authentication_token}</AuthenticationToken>
-        <DeveloperToken i:nil="false">{developer_token}</DeveloperToken>
-    </s:Header>
-    <s:Body>
-        <GetAccountsInfoRequest xmlns="https://bingads.microsoft.com/Customer/v13">
-            <CustomerId i:nil="false">{customer_id}</CustomerId>
-            <OnlyParentAccounts>false</OnlyParentAccounts>
-        </GetAccountsInfoRequest>
-    </s:Body>
-</s:Envelope>
-"""
 
 
 def get_field(*fields, obj: dict, default=None):
@@ -49,25 +19,35 @@ def get_field(*fields, obj: dict, default=None):
     return obj
 
 
-def _get_request_response(headers: dict, data: str):
+def _request(headers: dict, data: str):
     response = requests.post(SOAP_CUSTOMER_MANAGEMENT_URL, headers=headers, data=data,)
 
     response.raise_for_status()
 
-    response = response.content.decode("utf-8")
-    response = xmltodict.parse(response)
+    response_decoded = response.content.decode("utf-8")
+    response_xml_parsed = xmltodict.parse(response_decoded)
 
-    assert response and isinstance(response, OrderedDict)
-
-    return response
+    return response_xml_parsed
 
 
-def fetch_ad_accounts(access_token: str, developer_token: str):
-    response = _get_request_response(
+def _request_customer_id(access_token: str, developer_token: str) -> int:
+    response = _request(
         headers={"content-type": "text/xml", "SOAPAction": "GetCustomersInfo"},
-        data=SOAP_REQUEST_CUSTOMER_INFO.format(
-            authentication_token=access_token, developer_token=developer_token,
-        ),
+        data=f"""
+            <s:Envelope xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                <s:Header xmlns="https://bingads.microsoft.com/Customer/v13">
+                    <Action mustUnderstand="1">GetCustomersInfo</Action>
+                    <AuthenticationToken i:nil="false">{access_token}</AuthenticationToken>
+                    <DeveloperToken i:nil="false">{developer_token}</DeveloperToken>
+                </s:Header>
+                <s:Body>
+                    <GetCustomersInfoRequest xmlns="https://bingads.microsoft.com/Customer/v13">
+                        <CustomerNameFilter i:nil="false"></CustomerNameFilter>
+                        <TopN>1</TopN>
+                    </GetCustomersInfoRequest>
+                </s:Body>
+            </s:Envelope>
+        """,
     )
 
     customer_id = get_field(
@@ -80,20 +60,32 @@ def fetch_ad_accounts(access_token: str, developer_token: str):
         obj=response,
     )
 
-    assert customer_id and isinstance(customer_id, str)
+    return int(customer_id)
 
-    customer_id = int(customer_id)
 
-    response = _get_request_response(
+def _request_ad_accounts(
+    customer_id: int, access_token: str, developer_token: str
+) -> list:
+    response = _request(
         headers={"content-type": "text/xml", "SOAPAction": "GetAccountsInfo"},
-        data=SOAP_REQUEST_CUSTOMER_AD_ACCOUNTS.format(
-            authentication_token=access_token,
-            developer_token=developer_token,
-            customer_id=customer_id,
-        ),
+        data=f"""
+            <s:Envelope xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                <s:Header xmlns="https://bingads.microsoft.com/Customer/v13">
+                    <Action mustUnderstand="1">GetAccountsInfo</Action>
+                    <AuthenticationToken i:nil="false">{access_token}</AuthenticationToken>
+                    <DeveloperToken i:nil="false">{developer_token}</DeveloperToken>
+                </s:Header>
+                <s:Body>
+                    <GetAccountsInfoRequest xmlns="https://bingads.microsoft.com/Customer/v13">
+                        <CustomerId i:nil="false">{customer_id}</CustomerId>
+                        <OnlyParentAccounts>false</OnlyParentAccounts>
+                    </GetAccountsInfoRequest>
+                </s:Body>
+            </s:Envelope>
+        """,
     )
 
-    ad_accounts = get_field(
+    ad_account_or_accounts = get_field(
         "s:Envelope",
         "s:Body",
         "GetAccountsInfoResponse",
@@ -103,10 +95,16 @@ def fetch_ad_accounts(access_token: str, developer_token: str):
         default=[],
     )
 
-    if isinstance(ad_accounts, (OrderedDict, dict)):
-        ad_accounts = [ad_accounts]
+    if isinstance(ad_account_or_accounts, (OrderedDict, dict)):
+        return [ad_account_or_accounts]
 
-    response = response["s:Envelope"]["s:Body"]["GetAccountsInfoResponse"]
+    return ad_account_or_accounts
+
+
+def fetch_ad_accounts(access_token: str, developer_token: str):
+    customer_id = _request_customer_id(access_token, developer_token)
+
+    ad_accounts = _request_ad_accounts(customer_id, access_token, developer_token)
 
     result_ad_accounts = [ad_account["a:Id"] for ad_account in ad_accounts]
 
