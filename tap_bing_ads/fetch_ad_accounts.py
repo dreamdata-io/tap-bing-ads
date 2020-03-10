@@ -2,6 +2,7 @@ import requests
 import logging
 import xmltodict
 
+from collections import OrderedDict
 from requests.exceptions import HTTPError
 
 logger = logging.getLogger(__name__)
@@ -39,26 +40,26 @@ SOAP_REQUEST_CUSTOMER_AD_ACCOUNTS = """
 """
 
 
+def get_field(*fields, obj: dict, default=None):
+    for field in fields:
+        obj = obj.get(field)
+        if obj is None:
+            return default
+
+    return obj
+
+
 def _get_request_response(headers: dict, data: str):
-    try:
-        response = requests.post(
-            SOAP_CUSTOMER_MANAGEMENT_URL, headers=headers, data=data,
-        )
+    response = requests.post(SOAP_CUSTOMER_MANAGEMENT_URL, headers=headers, data=data,)
 
-        response.raise_for_status()
+    response.raise_for_status()
 
-        response = response.content.decode("utf-8")
-        response = xmltodict.parse(response)
+    response = response.content.decode("utf-8")
+    response = xmltodict.parse(response)
 
-        return response
-    except HTTPError as http_err:
-        logger.error(f"HTTP error occurred: {http_err}")
-    except UnicodeError as unicode_err:
-        logger.error(f"Unicode decoding error occurred: {unicode_err}")
-    except Exception as err:
-        logger.error(f"Other error occurred: {err}")
+    assert response and isinstance(response, OrderedDict)
 
-    raise Exception("Could not process request response")
+    return response
 
 
 def fetch_ad_accounts(access_token: str, developer_token: str):
@@ -69,13 +70,19 @@ def fetch_ad_accounts(access_token: str, developer_token: str):
         ),
     )
 
-    customer_id = None
-
-    customer_id = response["s:Envelope"]["s:Body"]["GetCustomersInfoResponse"][
-        "CustomersInfo"
-    ]["a:CustomerInfo"]["a:Id"]
+    customer_id = get_field(
+        "s:Envelope",
+        "s:Body",
+        "GetCustomersInfoResponse",
+        "CustomersInfo",
+        "a:CustomerInfo",
+        "a:Id",
+        obj=response,
+    )
 
     assert customer_id and isinstance(customer_id, str)
+
+    customer_id = int(customer_id)
 
     response = _get_request_response(
         headers={"content-type": "text/xml", "SOAPAction": "GetAccountsInfo"},
@@ -86,19 +93,21 @@ def fetch_ad_accounts(access_token: str, developer_token: str):
         ),
     )
 
+    ad_accounts = get_field(
+        "s:Envelope",
+        "s:Body",
+        "GetAccountsInfoResponse",
+        "AccountsInfo",
+        "a:AccountInfo",
+        obj=response,
+        default=[],
+    )
+
+    if isinstance(ad_accounts, (OrderedDict, dict)):
+        ad_accounts = [ad_accounts]
+
     response = response["s:Envelope"]["s:Body"]["GetAccountsInfoResponse"]
 
-    result_ad_accounts = []
-
-    if response.get("AccountsInfo") and response.get("AccountsInfo").get(
-        "a:AccountInfo"
-    ):
-        ad_accounts = response["AccountsInfo"]["a:AccountInfo"]
-
-        if not isinstance(ad_accounts, list):
-            ad_accounts = [ad_accounts]
-
-        for ad_account in ad_accounts:
-            result_ad_accounts.append(ad_account["a:Id"])
+    result_ad_accounts = [ad_account["a:Id"] for ad_account in ad_accounts]
 
     return customer_id, result_ad_accounts
