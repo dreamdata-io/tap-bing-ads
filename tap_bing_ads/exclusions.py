@@ -11,6 +11,10 @@ EXCLUSIONS = {
             "ImpressionLostToExpectedCtrPercent",
             "ImpressionLostToRankPercent",
             "ImpressionSharePercent",
+            "TopImpressionRatePercent",
+            "TopImpressionShareLostToBudgetPercent",
+            "TopImpressionShareLostToRankPercent",
+            "TopImpressionSharePercent",
         ],
     },
     "AdGroupPerformanceReport": {
@@ -25,6 +29,10 @@ EXCLUSIONS = {
             "ImpressionLostToExpectedCtrPercent",
             "ImpressionLostToRankPercent",
             "ImpressionSharePercent",
+            "TopImpressionRatePercent",
+            "TopImpressionShareLostToBudgetPercent",
+            "TopImpressionShareLostToRankPercent",
+            "TopImpressionSharePercent",
         ],
     },
     "CampaignPerformanceReport": {
@@ -46,6 +54,10 @@ EXCLUSIONS = {
             "ImpressionLostToExpectedCtrPercent",
             "ImpressionLostToRankPercent",
             "ImpressionSharePercent",
+            "TopImpressionRatePercent",
+            "TopImpressionShareLostToBudgetPercent",
+            "TopImpressionShareLostToRankPercent",
+            "TopImpressionSharePercent",
         ],
     },
     "ProductDimensionPerformanceReport": {
