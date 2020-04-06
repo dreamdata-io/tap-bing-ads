@@ -32,6 +32,7 @@ REQUIRED_CONFIG_KEYS = [
     "oauth_client_secret",
     "refresh_token",
     "developer_token",
+    "account_ids",
 ]
 
 # objects that are at the root level, with selectable fields in the Stitch UI
@@ -1033,15 +1034,28 @@ def refresh_access_token():
     )._access_token
 
 
+def get_account_ids(fetched_account_ids):
+    config_account_ids = CONFIG.get("account_ids", [])
+    if not config_account_ids:
+        return fetched_account_ids
+    if set(config_account_ids).issubset(set(fetched_account_ids)):
+        account_ids = config_account_ids
+    else:
+        account_ids = list(
+            set(config_account_ids).intersection(set(fetched_account_ids))
+        )
+    return account_ids
+
+
 async def main_impl():
 
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
 
     CONFIG.update(args.config)
-    customer_id, account_ids = fetch_ad_accounts(
-        access_token=refresh_access_token(),
-        developer_token=CONFIG['developer_token'],
+    customer_id, fetched_account_ids = fetch_ad_accounts(
+        access_token=refresh_access_token(), developer_token=CONFIG["developer_token"],
     )
+    account_ids = get_account_ids(fetched_account_ids)
     CONFIG.update({"customer_id": customer_id})
     STATE.update(args.state)
 
