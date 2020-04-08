@@ -13,10 +13,10 @@ setup(
     install_requires=[
         "arrow==0.15.5",
         "bingads==13.0.2",
-        "requests==2.23.0",
-        "singer-python==5.9.0",
+        "requests==2.22.0",
+        "singer-python==5.8.1",
         "stringcase==1.2.0",
-        "backoff==1.10.0",
+        "backoff==1.8.0",
         "xmltodict==0.12.0",
     ],
     extras_require={"dev": ["ipdb"]},
