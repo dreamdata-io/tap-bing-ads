@@ -465,7 +465,7 @@ def discover_reports():
             report_schema = get_report_schema(client, report_name)
             report_metadata = get_report_metadata(report_name, report_schema)
             report_stream_def = get_stream_def(
-                stream_name, report_schema, stream_metadata=report_metadata
+                stream_name, report_schema, stream_metadata=report_metadata,replication_key="date"
             )
             report_streams.append(report_stream_def)
 
