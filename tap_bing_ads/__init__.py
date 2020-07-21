@@ -523,9 +523,15 @@ def build_report_request(client, account_id, report_name, start_date, end_date):
 
     # excluded_fields = ["_sdc_report_datetime"]
     # selected_fields = get_selected_fields(report_stream, exclude=excluded_fields)
-    # report_columns = client.factory.create("ArrayOf{}Column".format(report_name))
-    # getattr(report_columns, "{}Column".format(report_name)).append(selected_fields)
-    # report_request.Columns = report_columns
+    selected_fields = reports.REPORT_REQUIRED_FIELDS
+    if report_name in reports.REPORT_SPECIFIC_REQUIRED_FIELDS:
+        selected_fields = (
+            reports.REPORT_REQUIRED_FIELDS
+            + reports.REPORT_SPECIFIC_REQUIRED_FIELDS[report_name]
+        )
+    report_columns = client.factory.create("ArrayOf{}Column".format(report_name))
+    getattr(report_columns, "{}Column".format(report_name)).append(selected_fields)
+    report_request.Columns = report_columns
 
     request_start_date = client.factory.create("Date")
     request_start_date.Day = start_date.day
