@@ -744,8 +744,7 @@ def log_retry_attempt(details):
 
 @backoff.on_exception(
     backoff.constant,
-    requests.exceptions.ConnectionError,
-    socket.timeout,
+    (requests.exceptions.ConnectionError,socket.timeout),
     max_tries=5,
     on_backoff=log_retry_attempt,
 )
