@@ -23,6 +23,7 @@ from tap_bing_ads import reports
 from tap_bing_ads.exclusions import EXCLUSIONS
 from tap_bing_ads.fetch_ad_accounts import fetch_ad_accounts
 import xmltodict
+import socket
 
 LOGGER = singer.get_logger()
 
@@ -744,6 +745,7 @@ def log_retry_attempt(details):
 @backoff.on_exception(
     backoff.constant,
     requests.exceptions.ConnectionError,
+    socket.timeout,
     max_tries=5,
     on_backoff=log_retry_attempt,
 )
