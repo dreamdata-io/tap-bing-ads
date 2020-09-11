@@ -803,7 +803,7 @@ def get_report_interval(state_key):
 async def sync_report(client, account_id, report_stream):
     report_max_days = int(CONFIG.get("report_max_days", 30))
 
-    state_key = "{}_{}".format(account_id, report_stream.stream)
+    state_key = report_stream.stream
 
     start_date, end_date = get_report_interval(state_key)
 
@@ -818,7 +818,7 @@ async def sync_report(client, account_id, report_stream):
         current_end_date = min(current_start_date.shift(days=report_max_days), end_date)
         try:
             success = await sync_report_interval(
-                client, account_id, report_stream, current_start_date, current_end_date
+                client, account_id, report_stream, current_start_date, current_end_date,state_key
             )
         except InvalidDateRangeEnd as ex:
             LOGGER.warn(
@@ -831,8 +831,7 @@ async def sync_report(client, account_id, report_stream):
             current_start_date = current_end_date.shift(days=1)
 
 
-async def sync_report_interval(client, account_id, report_stream, start_date, end_date):
-    state_key = "{}_{}".format(account_id, report_stream.stream)
+async def sync_report_interval(client, account_id, report_stream, start_date, end_date,state_key):
     report_name = stringcase.pascalcase(report_stream.stream)
 
     report_schema = get_report_schema(client, report_name)
