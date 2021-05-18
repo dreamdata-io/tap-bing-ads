@@ -1015,11 +1015,6 @@ async def do_sync_all_accounts(account_ids, catalog):
     selected_streams = {}
     for stream in filter(lambda x: x.is_selected(), catalog.streams):
         selected_streams[stream.tap_stream_id] = stream
-
-    if "accounts" in selected_streams:
-        LOGGER.info("Syncing Accounts")
-        sync_accounts_stream(account_ids, selected_streams["accounts"])
-
     sync_account_data_tasks = [
         sync_account_data(account_id, catalog, selected_streams)
         for account_id in account_ids
