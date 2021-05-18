@@ -2,6 +2,7 @@ import requests
 import logging
 import xmltodict
 
+from typing import Dict, Optional, Any, cast
 from collections import OrderedDict
 from requests.exceptions import HTTPError
 
@@ -10,13 +11,13 @@ logger = logging.getLogger(__name__)
 SOAP_CUSTOMER_MANAGEMENT_URL = "https://clientcenter.api.bingads.microsoft.com/Api/CustomerManagement/v13/CustomerManagementService.svc"
 
 
-def get_field(*fields, obj: dict, default=None):
+def get_field(*fields: str, obj: Dict, default=None) -> Optional[Any]:
+    o: Optional[Dict] = obj
     for field in fields:
-        obj = obj.get(field)
-        if obj is None:
+        o = o.get(field)
+        if o is None:
             return default
-
-    return obj
+    return o
 
 
 def _request(headers: dict, data: str) -> Dict:
@@ -66,7 +67,7 @@ def _request_customer_id(access_token: str, developer_token: str) -> int:
         obj=response,
     )
 
-    return int(customer_id)
+    return int(cast(str, customer_id))
 
 
 def _request_ad_accounts(
