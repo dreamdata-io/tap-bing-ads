@@ -1064,6 +1064,11 @@ async def main_impl():
     account_ids = CONFIG["account_ids"]
     STATE.update(args.state)
 
+    if args.discover:
+        do_discover(account_ids)
+        LOGGER.info("Discovery complete")
+        return
+
     await do_sync_all_accounts(account_ids, args.catalog)
     LOGGER.info("Sync Completed")
 
