@@ -18,7 +18,6 @@ import stringcase
 import requests
 import arrow
 import backoff
-from requests.exceptions import HTTPError
 from tap_bing_ads import reports
 from tap_bing_ads.exclusions import EXCLUSIONS
 from tap_bing_ads.fetch_ad_accounts import request_customer_id
@@ -638,7 +637,6 @@ def sync_ads(client, selected_streams, ad_group_ids):
 
 
 def sync_data(catalog_entry, data, key_properties=None):
-
     schema = catalog_entry.schema.to_dict()
     mdata = metadata.to_map(catalog_entry.metadata)
     tap_stream_id = catalog_entry.tap_stream_id
@@ -649,7 +647,8 @@ def sync_data(catalog_entry, data, key_properties=None):
                 d = transformer.transform(d, schema, mdata)
 
                 singer.write_record(
-                    tap_stream_id, d,
+                    tap_stream_id,
+                    d,
                 )
                 counter.increment()
 
@@ -743,7 +742,7 @@ def log_retry_attempt(details):
 
 @backoff.on_exception(
     backoff.constant,
-    (requests.exceptions.ConnectionError,socket.timeout),
+    (requests.exceptions.ConnectionError, socket.timeout),
     max_tries=5,
     on_backoff=log_retry_attempt,
 )
@@ -817,7 +816,12 @@ async def sync_report(client, account_id, report_stream):
         current_end_date = min(current_start_date.shift(days=report_max_days), end_date)
         try:
             success = await sync_report_interval(
-                client, account_id, report_stream, current_start_date, current_end_date,state_key
+                client,
+                account_id,
+                report_stream,
+                current_start_date,
+                current_end_date,
+                state_key,
             )
         except InvalidDateRangeEnd as ex:
             LOGGER.warn(
@@ -830,7 +834,9 @@ async def sync_report(client, account_id, report_stream):
             current_start_date = current_end_date.shift(days=1)
 
 
-async def sync_report_interval(client, account_id, report_stream, start_date, end_date,state_key):
+async def sync_report_interval(
+    client, account_id, report_stream, start_date, end_date, state_key
+):
     report_name = stringcase.pascalcase(report_stream.stream)
 
     report_schema = get_report_schema(client, report_name)
