@@ -19,13 +19,19 @@ def get_field(*fields, obj: dict, default=None):
     return obj
 
 
-def _request(headers: dict, data: str):
-    response = requests.post(SOAP_CUSTOMER_MANAGEMENT_URL, headers=headers, data=data,)
+def _request(headers: dict, data: str) -> Dict:
+    response = requests.post(
+        SOAP_CUSTOMER_MANAGEMENT_URL,
+        headers=headers,
+        data=data,
+    )
 
     response.raise_for_status()
 
     response_decoded = response.content.decode("utf-8")
     response_xml_parsed = xmltodict.parse(response_decoded)
+
+    response_xml_parsed = cast(Dict, response_xml_parsed)
 
     return response_xml_parsed
 
