@@ -21,8 +21,7 @@ import backoff
 from requests.exceptions import HTTPError
 from tap_bing_ads import reports
 from tap_bing_ads.exclusions import EXCLUSIONS
-from tap_bing_ads.fetch_ad_accounts import fetch_ad_accounts
-import xmltodict
+from tap_bing_ads.fetch_ad_accounts import request_customer_id
 import socket
 
 LOGGER = singer.get_logger()
@@ -1055,21 +1054,17 @@ async def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
 
     CONFIG.update(args.config)
-    customer_id, fetched_account_ids = fetch_ad_accounts(
-        access_token=refresh_access_token(), developer_token=CONFIG["developer_token"],
-    )
-    account_ids = get_account_ids(fetched_account_ids)
+
+    access_token = refresh_access_token()
+    developer_token = CONFIG["developer_token"]
+
+    customer_id = request_customer_id(access_token, developer_token)
     CONFIG.update({"customer_id": customer_id})
+    account_ids = CONFIG["account_ids"]
     STATE.update(args.state)
 
-    if args.discover:
-        do_discover(account_ids)
-        LOGGER.info("Discovery complete")
-    elif args.catalog:
-        await do_sync_all_accounts(account_ids, args.catalog)
-        LOGGER.info("Sync Completed")
-    else:
-        LOGGER.info("No catalog was provided")
+    await do_sync_all_accounts(account_ids, args.catalog)
+    LOGGER.info("Sync Completed")
 
 
 def main():

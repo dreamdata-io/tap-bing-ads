@@ -37,7 +37,7 @@ def _request(headers: dict, data: str) -> Dict:
     return response_xml_parsed
 
 
-def _request_customer_id(access_token: str, developer_token: str) -> int:
+def request_customer_id(access_token: str, developer_token: str) -> int:
     response = _request(
         headers={"content-type": "text/xml", "SOAPAction": "GetCustomersInfo"},
         data=f"""
