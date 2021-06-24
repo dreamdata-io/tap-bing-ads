@@ -1021,11 +1021,9 @@ async def do_sync_all_accounts(account_ids, catalog):
     selected_streams = {}
     for stream in filter(lambda x: x.is_selected(), catalog.streams):
         selected_streams[stream.tap_stream_id] = stream
-    sync_account_data_tasks = [
-        sync_account_data(account_id, catalog, selected_streams)
-        for account_id in account_ids
-    ]
-    await asyncio.gather(*sync_account_data_tasks)
+
+    for account_id in account_ids:
+        await sync_account_data(account_id, catalog, selected_streams)
 
 
 def refresh_access_token():
