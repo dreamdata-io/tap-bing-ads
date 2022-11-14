@@ -1,7 +1,7 @@
 import requests
 import logging
 import xmltodict
-
+import json
 from typing import Dict, Optional, Any, cast
 
 logger = logging.getLogger(__name__)
@@ -65,4 +65,17 @@ def request_customer_id(access_token: str, developer_token: str) -> int:
         obj=response,
     )
 
+    # The request return 200 even if we fail to get customer_id
+    error = get_field(
+        "s:Envelope",
+        "s:Body",
+        "s:Fault",
+        "detail",
+        "AdApiFaultDetail",
+        "Errors",
+        obj=response,
+    )
+
+    if error:
+        raise Exception(json.dumps(error))
     return int(cast(str, customer_id))
