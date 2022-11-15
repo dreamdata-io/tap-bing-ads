@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 SOAP_CUSTOMER_MANAGEMENT_URL = "https://clientcenter.api.bingads.microsoft.com/Api/CustomerManagement/v13/CustomerManagementService.svc"
 
 
+class InvalidCredentialsException(Exception):
+    pass
+
+
 def get_field(*fields: str, obj: Dict, default=None) -> Optional[Any]:
     o: Optional[Dict] = obj
     for field in fields:
@@ -73,9 +77,11 @@ def request_customer_id(access_token: str, developer_token: str) -> int:
         "detail",
         "AdApiFaultDetail",
         "Errors",
+        "AdApiError",
         obj=response,
     )
 
-    if error:
-        raise Exception(json.dumps(error))
+    if error and (error.get("Code") in ["105", "109"]):
+        raise InvalidCredentialsException(json.dumps(error))
+
     return int(cast(str, customer_id))
