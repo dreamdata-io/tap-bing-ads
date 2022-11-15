@@ -1,12 +1,16 @@
 import requests
 import logging
 import xmltodict
-
+import json
 from typing import Dict, Optional, Any, cast
 
 logger = logging.getLogger(__name__)
 
 SOAP_CUSTOMER_MANAGEMENT_URL = "https://clientcenter.api.bingads.microsoft.com/Api/CustomerManagement/v13/CustomerManagementService.svc"
+
+
+class InvalidCredentialsException(Exception):
+    pass
 
 
 def get_field(*fields: str, obj: Dict, default=None) -> Optional[Any]:
@@ -64,5 +68,20 @@ def request_customer_id(access_token: str, developer_token: str) -> int:
         "a:Id",
         obj=response,
     )
+
+    # The request return 200 even if we fail to get customer_id
+    error = get_field(
+        "s:Envelope",
+        "s:Body",
+        "s:Fault",
+        "detail",
+        "AdApiFaultDetail",
+        "Errors",
+        "AdApiError",
+        obj=response,
+    )
+
+    if error and (error.get("Code") in ["105", "109"]):
+        raise InvalidCredentialsException(json.dumps(error))
 
     return int(cast(str, customer_id))

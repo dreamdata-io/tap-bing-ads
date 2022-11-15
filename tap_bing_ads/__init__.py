@@ -20,7 +20,7 @@ import arrow
 import backoff
 from tap_bing_ads import reports
 from tap_bing_ads.exclusions import EXCLUSIONS
-from tap_bing_ads.fetch_ad_accounts import request_customer_id
+from tap_bing_ads.fetch_ad_accounts import request_customer_id, InvalidCredentialsException
 import socket
 
 LOGGER = singer.get_logger()
@@ -1075,8 +1075,11 @@ def main():
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(main_impl())
+    except InvalidCredentialsException as exc:
+        LOGGER.exception(exc)
+        sys.exit(5)
     except Exception as exc:
-        LOGGER.critical(exc)
+        LOGGER.exception(exc)
         raise exc
 
 
