@@ -12,6 +12,7 @@ from zipfile import ZipFile
 import singer
 from singer import utils, metadata, metrics, Transformer
 from bingads import AuthorizationData, OAuthWebAuthCodeGrant, ServiceClient
+from bingads.exceptions import OAuthTokenRequestException
 import suds
 from suds.sudsobject import asdict
 import stringcase
@@ -1075,6 +1076,9 @@ def main():
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(main_impl())
+    except OAuthTokenRequestException:
+        LOGGER.warn("oauth error", exc_info=True)
+        sys.exit(5)
     except InvalidCredentialsException as exc:
         LOGGER.exception(exc)
         sys.exit(5)
