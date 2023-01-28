@@ -81,7 +81,7 @@ def request_customer_id(access_token: str, developer_token: str) -> int:
         obj=response,
     )
 
-    if error and (error.get("Code") in ["105", "109"]):
+    if error and (error.get("Code") in ["105", "109", "124"]):
         raise InvalidCredentialsException(json.dumps(error))
 
     return int(cast(str, customer_id))
