@@ -21,7 +21,10 @@ import arrow
 import backoff
 from tap_bing_ads import reports
 from tap_bing_ads.exclusions import EXCLUSIONS
-from tap_bing_ads.fetch_ad_accounts import request_customer_id, InvalidCredentialsException
+from tap_bing_ads.fetch_ad_accounts import (
+    request_customer_id,
+    InvalidCredentialsException,
+)
 import socket
 
 LOGGER = singer.get_logger()
@@ -562,7 +565,7 @@ def sync_accounts_stream(account_ids, catalog_item):
         response = client.GetAccount(AccountId=account_id)
         accounts.append(sobject_to_dict(response))
 
-    accounts_bookmark = singer.get_bookmark(STATE, "accounts", "last_record")
+    accounts_bookmark = get_checkpoint("accounts", account_id, "last_record")
     if accounts_bookmark:
         accounts = list(
             filter(
@@ -573,7 +576,7 @@ def sync_accounts_stream(account_ids, catalog_item):
 
     max_accounts_last_modified = max([x["LastModifiedTime"] for x in accounts])
     sync_data(catalog_item, accounts, ["Id"])
-    singer.write_bookmark(STATE, "accounts", "last_record", max_accounts_last_modified)
+    write_checkpoint("accounts", account_id, "last_record", max_accounts_last_modified)
     singer.write_state(STATE)
 
 
@@ -775,14 +778,14 @@ def stream_report(stream_name, report_name, url, report_time):
                         counter.increment()
 
 
-def get_report_interval(state_key):
+def get_report_interval(state_key, account_id):
     report_max_days = int(CONFIG.get("report_max_days", 30))
     conversion_window = int(CONFIG.get("conversion_window", -30))
 
     config_start_date = arrow.get(CONFIG.get("start_date"))
     config_end_date = arrow.get(CONFIG.get("end_date")).floor("day")
 
-    bookmark_end_date = singer.get_bookmark(STATE, state_key, "date")
+    bookmark_end_date = get_checkpoint(state_key, account_id, "date")
     conversion_min_date = arrow.get().floor("day").shift(days=conversion_window)
 
     start_date = None
@@ -804,7 +807,7 @@ async def sync_report(client, account_id, report_stream):
 
     state_key = report_stream.stream
 
-    start_date, end_date = get_report_interval(state_key)
+    start_date, end_date = get_report_interval(state_key, account_id)
 
     LOGGER.info(
         "Generating {} reports for account {} between {} - {}".format(
@@ -849,7 +852,7 @@ async def sync_report_interval(
         client, account_id, report_stream, report_name, start_date, end_date, state_key
     )
 
-    singer.write_bookmark(STATE, state_key, "request_id", request_id)
+    write_checkpoint(state_key, account_id, "request_id", request_id)
     singer.write_state(STATE)
 
     try:
@@ -874,13 +877,12 @@ async def sync_report_interval(
             force_refresh=True,
         )
 
-        singer.write_bookmark(STATE, state_key, "request_id", request_id)
+        write_checkpoint(state_key, account_id, "request_id", request_id)
         singer.write_state(STATE)
 
         success, download_url = await poll_report(
             client, account_id, report_name, start_date, end_date, request_id
         )
-
     if success and download_url:
         LOGGER.info(
             "Streaming report: {} for account {} - from {} to {}".format(
@@ -889,8 +891,9 @@ async def sync_report_interval(
         )
 
         stream_report(report_stream.stream, report_name, download_url, report_time)
-        singer.write_bookmark(STATE, state_key, "request_id", None)
-        singer.write_bookmark(STATE, state_key, "date", end_date.isoformat())
+
+        write_checkpoint(state_key, account_id, "request_id", None)
+        write_checkpoint(state_key, account_id, "date", end_date.isoformat())
         singer.write_state(STATE)
         return True
     elif success and not download_url:
@@ -899,8 +902,8 @@ async def sync_report_interval(
                 report_name, account_id, start_date, end_date
             )
         )
-        singer.write_bookmark(STATE, state_key, "request_id", None)
-        singer.write_bookmark(STATE, state_key, "date", end_date.isoformat())
+        write_checkpoint(state_key, account_id, "request_id", None)
+        write_checkpoint(state_key, account_id, "date", end_date.isoformat())
         singer.write_state(STATE)
         return True
     else:
@@ -909,9 +912,21 @@ async def sync_report_interval(
                 report_name, account_id, start_date, end_date
             )
         )
-        singer.write_bookmark(STATE, state_key, "request_id", None)
+        write_checkpoint(state_key, account_id, "request_id", None)
         singer.write_state(STATE)
         return False
+
+
+def write_checkpoint(state_key, account_id, key, value):
+    if state_key not in STATE:
+        STATE[state_key] = {}
+    if account_id not in STATE[state_key]:
+        STATE[state_key][account_id] = {}
+    STATE[state_key][account_id][key] = value
+
+
+def get_checkpoint(state_key, account_id, key):
+    return STATE.get(state_key, {}).get(account_id, {}).get(key, None)
 
 
 def get_report_request_id(
@@ -925,7 +940,7 @@ def get_report_request_id(
     force_refresh=False,
 ):
 
-    saved_request_id = singer.get_bookmark(STATE, state_key, "request_id")
+    saved_request_id = get_checkpoint(state_key, account_id, "request_id")
     if not force_refresh and saved_request_id is not None:
         LOGGER.info(
             "Resuming polling for account {}: {}".format(account_id, report_name)
