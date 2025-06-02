@@ -939,7 +939,6 @@ def get_report_request_id(
     state_key,
     force_refresh=False,
 ):
-
     saved_request_id = get_checkpoint(state_key, account_id, "request_id")
     if not force_refresh and saved_request_id is not None:
         LOGGER.info(
@@ -1065,7 +1064,6 @@ def get_account_ids(fetched_account_ids):
 
 
 async def main_impl():
-
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
 
     CONFIG.update(args.config)
@@ -1087,6 +1085,12 @@ async def main_impl():
     LOGGER.info("Sync Completed")
 
 
+@backoff.on_exception(
+    backoff.constant,
+    (OAuthTokenRequestException),
+    max_tries=5,
+    on_backoff=log_retry_attempt,
+)
 def main():
     try:
         loop = asyncio.get_event_loop()
