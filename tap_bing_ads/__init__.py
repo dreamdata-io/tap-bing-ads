@@ -1087,7 +1087,7 @@ async def main_impl():
 
 @backoff.on_exception(
     backoff.constant,
-    (OAuthTokenRequestException),
+    (InvalidCredentialsException),
     max_tries=5,
     on_backoff=log_retry_attempt,
 )
