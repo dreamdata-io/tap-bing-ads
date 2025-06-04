@@ -1041,6 +1041,12 @@ async def do_sync_all_accounts(account_ids, catalog):
         await sync_account_data(account_id, catalog, selected_streams)
 
 
+@backoff.on_exception(
+    backoff.constant,
+    (OAuthTokenRequestException),
+    max_tries=5,
+    on_backoff=log_retry_attempt,
+)
 def refresh_access_token():
     authentication = OAuthWebAuthCodeGrant(
         CONFIG["oauth_client_id"], CONFIG["oauth_client_secret"], ""
@@ -1085,12 +1091,6 @@ async def main_impl():
     LOGGER.info("Sync Completed")
 
 
-@backoff.on_exception(
-    backoff.constant,
-    (InvalidCredentialsException),
-    max_tries=5,
-    on_backoff=log_retry_attempt,
-)
 def main():
     try:
         loop = asyncio.get_event_loop()
