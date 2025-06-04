@@ -939,7 +939,6 @@ def get_report_request_id(
     state_key,
     force_refresh=False,
 ):
-
     saved_request_id = get_checkpoint(state_key, account_id, "request_id")
     if not force_refresh and saved_request_id is not None:
         LOGGER.info(
@@ -1042,6 +1041,12 @@ async def do_sync_all_accounts(account_ids, catalog):
         await sync_account_data(account_id, catalog, selected_streams)
 
 
+@backoff.on_exception(
+    backoff.constant,
+    (OAuthTokenRequestException),
+    max_tries=5,
+    on_backoff=log_retry_attempt,
+)
 def refresh_access_token():
     authentication = OAuthWebAuthCodeGrant(
         CONFIG["oauth_client_id"], CONFIG["oauth_client_secret"], ""
@@ -1065,7 +1070,6 @@ def get_account_ids(fetched_account_ids):
 
 
 async def main_impl():
-
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
 
     CONFIG.update(args.config)
